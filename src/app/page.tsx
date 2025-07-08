@@ -60,8 +60,9 @@ export default function Home() {
     const [x, y] = confettiOrigin;
     const canvas = confettiCanvasRef.current;
     if (!canvas) return;
-    const myConfetti = confetti.create(canvas, { resize: true, useWorker: true });
-    myConfetti({
+    const myConfetti = confetti.create(canvas!, { resize: true, useWorker: true });
+    if (!myConfetti) return;
+    myConfetti?.({
       particleCount: 1200,
       startVelocity: 90,
       spread: 140,
@@ -70,7 +71,7 @@ export default function Home() {
       ticks: 900,
       scalar: 1.2,
       colors: ["#ff9860", "#651818", "#22c55e", "#ff9800", "#ef4444", "#fff"],
-    }).then(() => {
+    })?.then(() => {
       setShowConfettiBurst(false);
     });
   }, [showConfettiBurst, confettiOrigin]);
