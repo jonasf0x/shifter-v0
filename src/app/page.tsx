@@ -2,8 +2,6 @@
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
-import dynamic from "next/dynamic";
-const Confetti = dynamic(() => import("react-confetti"), { ssr: false });
 
 export default function Home() {
   // --- State ---
@@ -22,9 +20,6 @@ export default function Home() {
   const [breakCounter, setBreakCounter] = useState(0);
   const [confirmClockOut, setConfirmClockOut] = useState(false);
   const summaryRef = useRef<HTMLDivElement>(null);
-  const confettiRef = useRef<HTMLDivElement>(null);
-  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
-  const [confettiTimeout, setConfettiTimeout] = useState<NodeJS.Timeout | null>(null);
   const confettiCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [confettiOrigin, setConfettiOrigin] = useState<[number, number]>([0.5, 0.7]);
 
@@ -43,16 +38,6 @@ export default function Home() {
     }, 1000);
     return () => clearInterval(interval);
   }, [clockedIn, clockInTime, onBreak, breakStart, totalBreakMs]);
-
-  // --- Window size for confetti ---
-  useEffect(() => {
-    function handleResize() {
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    }
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   // --- Confetti burst with canvas ---
   useEffect(() => {
@@ -147,12 +132,6 @@ export default function Home() {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-  }
-
-  // Format current time for banner (no seconds)
-  function formatCurrentTimeNoSeconds(dateString: string) {
-    // dateString is like '14:23:45' or '14:23:00'
-    return dateString.split(":").slice(0, 2).join(":");
   }
 
   // --- Screenshot ---
