@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
+import Head from "next/head";
 
 const ibmPlexSans = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -21,6 +22,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={ibmPlexSans.className}>
+      <head>
+        <link rel="icon" href="/logo.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#651818" />
+      </head>
       <body className="antialiased">
         {children}
       </body>
