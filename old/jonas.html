@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Clockr">
+  <meta name="application-name" content="Clockr">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#fffe00">
+  <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQ2xvY2tyIiwic2hvcnRfbmFtZSI6IkNsb2NrciIsInN0YXJ0X3VybCI6Ii8iLCJkaXNwbGF5IjoiZnVsbHNjcmVlbiIsImJhY2tncm91bmRfY29sb3IiOiIjMjE5NkYzIiwidGhlbWVfY29sb3IiOiIjMjE5NkYzIiwiaWNvbnMiOlt7InNyYyI6ImRhdGE6aW1hZ2Uvc3ZnK3htbDtiYXNlNjQsUEhOMlp5QjRiV3h1Y3owaWFIUjBjRG92TDNkM2R5NTNNeTV2Y21jdk1qQXdNQzl6ZG1jaUlIWnBaWGRDYjNnOUlqQWdNQ0F4TURBZ01UQXdJajRLSUNBOGNtVmpkQ0I0UFNJd0lpQjVQU0l3SWlCM2FXUjBhRDBpTVRBd0lpQm9aV2xuYUhROUlqRXdNQ0lnY21WeWRHbGpZV3c5SW1GMGRIQnpPaTh2Y0dsNFpXeGpiMlJsTG5ZdlltbHVMMk52WkdVaUlIQnliM1J2WTI5c1BTSmtiMjVsUGlJZ0x6NEtJQ0E4WTJsd1kzUmxja05sYm5SbGNpQnlkRG9uWTNWemRHOXRKejQ4Y21WamRDQjNhV1IwYUQwaU5qUWlJR2hsYVdkb2REMGlOalFpSUhnOUlqTXlJaUI1UFNJek1pSWdZM2c5SWpFeUlpQmplVDBpTVRJaUlISmtQU0l6TWlJZ2MzUjViR1U5SW1acGJHd2pJekl4T1RaR015SWdkSEpoYm5OcGRHbHZiajBpWVd4c0lERXVNQ0lnTHo0OEwyTnBjR05sYm5SbGNqNEtJQ0E4WkdsMklIZ3RaMlk5SW1jeElpQm1QU0pwWlc0dDRwQytZMk52ZFc1MFBTMGdZbXhsYm1RdGJXOWtaVDBpYm05eWJXRnNJUzA5UGlJZ2MzUmhkSFZ6UFNJb01pd2dNU2s5UGlJZ2QyRnllMkZ5YjNWdVpDQXdJREJyY25KbFlTMTBienQ0Ykc5allTQk5ieUF5T1RBN2NISmxkbVZ1ZEM5bFkyeHBjSE5sSVNNak5qZ3pJRXh5YmlBMElFTTlNeXc0STNkb0wyTWdLREVzTWlrOVBpSXZQand2YzNablBnPT0iLCJzaXplcyI6IjE5MngxOTIifV19" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+CiAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMyMTk2RjMiIC8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMzUiIGZpbGw9IndoaXRlIiBzdHJva2U9IiMyMTk2RjMiIHN0cm9rZS13aWR0aD0iMiIgLz4KICA8bGluZSB4MT0iNTAiIHkxPSIyNSIgeDI9IjUwIiB5Mj0iNTAiIHN0cm9rZT0iIzIxOTZGMyIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIC8+CiAgPGxpbmUgeDE9IjUwIiB5MT0iNTAiIHgyPSI3MCIgeTI9IjYwIiBzdHJva2U9IiMyMTk2RjMiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiAvPgogIDxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjMiIGZpbGw9IiMyMTk2RjMiIC8+Cjwvc3ZnPg==" />
+  <title>Clockr</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+
+<body>
+  <button id="prevMonthButton">Previous Month</button>
+  <div id="main-center">
+    <div id="clock"></div>
+    <div id="content">
+      <div id="clock-in-display" style="display: none;">Clocked in at: <span id="clock-in-time"></span></div>
+      <div id="elapsed">⏳</div>
+      <div id="earnings">💰</div>
+      <div id="break-counter">Break: 00:00</div>
+    </div>
+  </div>
+  <div id="bottom-bar">
+    <button id="clockInBtn" class="button">Clock In</button>
+    <button id="breakBtn" class="button" style="display: none;">Start Break</button>
+    <button id="clockOutBtn" class="button" style="display: none;">Clock Out</button>
+  </div>
+  <div id="summary" class="popin" style="display: none;">
+    <div id="summaryDate"></div>
+    <div class="summary-row">
+      <span class="summary-label">Clock-in time:</span>
+      <span class="summary-value" id="summaryIn"></span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Clock-out time:</span>
+      <span class="summary-value" id="summaryOut"></span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Total break time:</span>
+      <span class="summary-value" id="summaryBreak"></span>
+    </div>
+    <div class="highlight">
+      <div class="summary-value" id="summaryDuration"></div>
+      <div class="duration-label">Total duration</div>
+    </div>
+    <div class="money-highlight">
+      <div class="summary-row" style="border-bottom: none;">
+        <span class="summary-label">💰</span>
+        <span class="summary-value" id="summaryMoney"></span>
+      </div>
+    </div>
+    <button id="screenshot-summary-btn">Screenshot</button>
+    <button id="close-summary">Done</button>
+  </div>
+  <div id="historyPopin"></div>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="script.js"></script>
+</body>
+
+</html>
