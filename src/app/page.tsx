@@ -16,9 +16,20 @@ interface SessionData {
   lastSaved: number; // timestamp
 }
 
+// History entry interface
+interface HistoryEntry {
+  date: string; // YYYY-MM-DD format
+  clockInTime: string; // ISO string
+  clockOutTime: string; // ISO string
+  totalBreakMs: number;
+  totalWorkMs: number; // calculated work time
+  timestamp: number; // when entry was created
+}
+
 // Storage keys
 const STORAGE_KEY = 'shifter_session_data';
 const BACKUP_STORAGE_KEY = 'shifter_session_backup';
+const HISTORY_STORAGE_KEY = 'shifter_history_data';
 
 // Utility functions for data persistence
 function saveToStorage(data: SessionData, key: string = STORAGE_KEY) {
@@ -48,6 +59,35 @@ function clearStorage(key: string = STORAGE_KEY) {
   }
 }
 
+// History management functions
+function saveHistoryEntry(entry: HistoryEntry) {
+  try {
+    const existing = loadHistoryData();
+    const updated = [entry, ...existing.filter(e => e.date !== entry.date)].slice(0, 40); // Keep last 40 days
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated));
+  } catch (error) {
+    console.error('Failed to save history:', error);
+  }
+}
+
+function loadHistoryData(): HistoryEntry[] {
+  try {
+    const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Failed to load history:', error);
+    return [];
+  }
+}
+
+function clearHistoryData() {
+  try {
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
+  } catch (error) {
+    console.error('Failed to clear history:', error);
+  }
+}
+
 export default function Home() {
   // --- State ---
   const [showSummary, setShowSummary] = useState(false);
@@ -71,6 +111,8 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [showRecoveryMessage, setShowRecoveryMessage] = useState(false);
   const [showBackupMenu, setShowBackupMenu] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyData, setHistoryData] = useState<HistoryEntry[]>([]);
 
   // --- Data persistence functions ---
   const saveSessionData = () => {
@@ -138,6 +180,9 @@ export default function Home() {
   useEffect(() => {
     const loaded = loadSessionData();
     setIsDataLoaded(true);
+    
+    // Load history data
+    setHistoryData(loadHistoryData());
     
     // If we have an active session, validate it
     if (loaded && clockedIn && clockInTime) {
@@ -300,6 +345,20 @@ export default function Home() {
     setBreakStart(null);
     setBreakCounter(0);
     setConfirmClockOut(false);
+    
+    // Save to history
+    if (clockInTime && clockOutTime) {
+      const entry: HistoryEntry = {
+        date: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+        clockInTime: clockInTime.toISOString(),
+        clockOutTime: clockOutTime.toISOString(),
+        totalBreakMs,
+        totalWorkMs: clockOutTime.getTime() - clockInTime.getTime() - totalBreakMs,
+        timestamp: Date.now()
+      };
+      saveHistoryEntry(entry);
+      setHistoryData(loadHistoryData()); // Refresh history data
+    }
   }
 
   // --- Formatting helpers ---
@@ -357,6 +416,15 @@ export default function Home() {
     link.click();
   }
 
+  function exportHistoryData() {
+    const dataStr = JSON.stringify(historyData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `shifter-history-${Date.now()}.json`;
+    link.click();
+  }
+
   function importSessionData(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -383,6 +451,33 @@ export default function Home() {
       } catch (error) {
         console.error('Failed to import session data:', error);
         alert('Invalid session data file');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function importHistoryData(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string) as HistoryEntry[];
+        
+        // Validate the imported data
+        if (Array.isArray(data) && data.every(entry => entry.date && entry.clockInTime && entry.clockOutTime)) {
+          // Merge with existing history, keeping unique dates
+          const existing = loadHistoryData();
+          const merged = [...data, ...existing.filter(e => !data.some(d => d.date === e.date))];
+          const final = merged.slice(0, 40); // Keep last 40 days
+          
+          localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(final));
+          setHistoryData(final);
+        }
+      } catch (error) {
+        console.error('Failed to import history data:', error);
+        alert('Invalid history data file');
       }
     };
     reader.readAsText(file);
@@ -545,11 +640,106 @@ export default function Home() {
             />
           </label>
           <button 
-            onClick={() => { clearSessionData(); resetToHome(); setShowBackupMenu(false); }}
+            onClick={() => { exportHistoryData(); setShowBackupMenu(false); }}
+            className="w-full text-left px-2 py-1 text-sm hover:bg-gray-100 rounded"
+          >
+            Export History Data
+          </button>
+          <label className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 rounded cursor-pointer">
+            Import History Data
+            <input 
+              type="file" 
+              accept=".json" 
+              onChange={(e) => { importHistoryData(e); setShowBackupMenu(false); }}
+              className="hidden"
+            />
+          </label>
+          <button 
+            onClick={() => { setShowHistory(true); setShowBackupMenu(false); }}
+            className="w-full text-left px-2 py-1 text-sm hover:bg-gray-100 rounded"
+          >
+            View History
+          </button>
+          <button 
+            onClick={() => { clearSessionData(); clearHistoryData(); resetToHome(); setShowBackupMenu(false); }}
             className="w-full text-left px-2 py-1 text-sm hover:bg-gray-100 rounded text-red-600"
           >
             Clear All Data
           </button>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h2 className="text-xl font-bold text-[#651818]">Work History (Last 40 Days)</h2>
+              <button 
+                onClick={() => setShowHistory(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto max-h-[60vh] p-4">
+              {historyData.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  No history available. Complete a session to see your work history.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historyData.map((entry, index) => {
+                    const date = new Date(entry.date);
+                    const clockIn = new Date(entry.clockInTime);
+                    const clockOut = new Date(entry.clockOutTime);
+                    const workHours = Math.floor(entry.totalWorkMs / (1000 * 60 * 60));
+                    const workMinutes = Math.floor((entry.totalWorkMs % (1000 * 60 * 60)) / (1000 * 60));
+                    const breakHours = Math.floor(entry.totalBreakMs / (1000 * 60 * 60));
+                    const breakMinutes = Math.floor((entry.totalBreakMs % (1000 * 60 * 60)) / (1000 * 60));
+                    
+                    return (
+                      <div key={index} className="border rounded-lg p-3 bg-gray-50">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="font-semibold text-[#651818]">
+                            {date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {workHours}h {workMinutes}m work
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-gray-600">Clock In:</span>
+                            <span className="font-mono ml-1">{clockIn.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Clock Out:</span>
+                            <span className="font-mono ml-1">{clockOut.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Break:</span>
+                            <span className="font-mono ml-1">{breakHours}h {breakMinutes}m</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Total:</span>
+                            <span className="font-mono ml-1">{workHours + breakHours}h {workMinutes + breakMinutes}m</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t bg-gray-50">
+              <div className="text-sm text-gray-600">
+                Total entries: {historyData.length} / 40 days
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
