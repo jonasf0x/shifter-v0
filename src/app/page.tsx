@@ -3,6 +3,51 @@ import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
 
+// Data persistence interface
+interface SessionData {
+  clockedIn: boolean;
+  onBreak: boolean;
+  clockInTime: string | null; // ISO string
+  clockOutTime: string | null; // ISO string
+  breakStart: string | null; // ISO string
+  totalBreakMs: number;
+  elapsedMs: number;
+  breakCounter: number;
+  lastSaved: number; // timestamp
+}
+
+// Storage keys
+const STORAGE_KEY = 'shifter_session_data';
+const BACKUP_STORAGE_KEY = 'shifter_session_backup';
+
+// Utility functions for data persistence
+function saveToStorage(data: SessionData, key: string = STORAGE_KEY) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.error('Failed to save to localStorage:', error);
+  }
+}
+
+function loadFromStorage(key: string = STORAGE_KEY): SessionData | null {
+  try {
+    const stored = localStorage.getItem(key);
+    if (!stored) return null;
+    return JSON.parse(stored);
+  } catch (error) {
+    console.error('Failed to load from localStorage:', error);
+    return null;
+  }
+}
+
+function clearStorage(key: string = STORAGE_KEY) {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.error('Failed to clear localStorage:', error);
+  }
+}
+
 export default function Home() {
   // --- State ---
   const [showSummary, setShowSummary] = useState(false);
@@ -22,6 +67,148 @@ export default function Home() {
   const summaryRef = useRef<HTMLDivElement>(null);
   const confettiCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [confettiOrigin, setConfettiOrigin] = useState<[number, number]>([0.5, 0.7]);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showRecoveryMessage, setShowRecoveryMessage] = useState(false);
+  const [showBackupMenu, setShowBackupMenu] = useState(false);
+
+  // --- Data persistence functions ---
+  const saveSessionData = () => {
+    setIsSaving(true);
+    const sessionData: SessionData = {
+      clockedIn,
+      onBreak,
+      clockInTime: clockInTime?.toISOString() || null,
+      clockOutTime: clockOutTime?.toISOString() || null,
+      breakStart: breakStart?.toISOString() || null,
+      totalBreakMs,
+      elapsedMs,
+      breakCounter,
+      lastSaved: Date.now()
+    };
+    
+    // Save to primary storage
+    saveToStorage(sessionData, STORAGE_KEY);
+    // Save backup
+    saveToStorage(sessionData, BACKUP_STORAGE_KEY);
+    
+    // Clear saving indicator after a short delay
+    setTimeout(() => setIsSaving(false), 500);
+  };
+
+  const loadSessionData = (): boolean => {
+    // Try primary storage first
+    let data = loadFromStorage(STORAGE_KEY);
+    let usedBackup = false;
+    
+    // If primary fails, try backup
+    if (!data) {
+      data = loadFromStorage(BACKUP_STORAGE_KEY);
+      usedBackup = true;
+    }
+    
+    if (data) {
+      setClockedIn(data.clockedIn);
+      setOnBreak(data.onBreak);
+      setClockInTime(data.clockInTime ? new Date(data.clockInTime) : null);
+      setClockOutTime(data.clockOutTime ? new Date(data.clockOutTime) : null);
+      setBreakStart(data.breakStart ? new Date(data.breakStart) : null);
+      setTotalBreakMs(data.totalBreakMs);
+      setElapsedMs(data.elapsedMs);
+      setBreakCounter(data.breakCounter);
+      
+      // Show recovery message if backup was used
+      if (usedBackup) {
+        setShowRecoveryMessage(true);
+        setTimeout(() => setShowRecoveryMessage(false), 5000);
+      }
+      
+      return true;
+    }
+    
+    return false;
+  };
+
+  const clearSessionData = () => {
+    clearStorage(STORAGE_KEY);
+    clearStorage(BACKUP_STORAGE_KEY);
+  };
+
+  // --- Load data on component mount ---
+  useEffect(() => {
+    const loaded = loadSessionData();
+    setIsDataLoaded(true);
+    
+    // If we have an active session, validate it
+    if (loaded && clockedIn && clockInTime) {
+      const now = new Date();
+      const sessionAge = now.getTime() - clockInTime.getTime();
+      
+      // If session is older than 24 hours, clear it (safety measure)
+      if (sessionAge > 24 * 60 * 60 * 1000) {
+        clearSessionData();
+        resetToHome();
+      } else {
+        // Update elapsed time for active sessions
+        if (!onBreak) {
+          setElapsedMs(now.getTime() - clockInTime.getTime() - totalBreakMs);
+        }
+        if (onBreak && breakStart) {
+          setBreakCounter(now.getTime() - breakStart.getTime());
+        }
+      }
+    }
+  }, []);
+
+  // --- Auto-save data when state changes ---
+  useEffect(() => {
+    if (isDataLoaded) {
+      saveSessionData();
+    }
+  }, [clockedIn, onBreak, clockInTime, clockOutTime, breakStart, totalBreakMs, elapsedMs, breakCounter, isDataLoaded]);
+
+  // --- Page visibility API for additional persistence ---
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // Save data when page becomes hidden
+        saveSessionData();
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      // Save data before page unload
+      saveSessionData();
+    };
+
+    // Periodic save every 30 seconds for active sessions
+    const periodicSave = setInterval(() => {
+      if (clockedIn || onBreak) {
+        saveSessionData();
+      }
+    }, 30000);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      clearInterval(periodicSave);
+    };
+  }, [clockedIn, onBreak, clockInTime, clockOutTime, breakStart, totalBreakMs, elapsedMs, breakCounter]);
+
+  // --- Click outside to close backup menu ---
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showBackupMenu && !(event.target as Element).closest('.backup-menu')) {
+        setShowBackupMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showBackupMenu]);
 
   // --- Real-time clock and date ---
   useEffect(() => {
@@ -148,6 +335,59 @@ export default function Home() {
     }
   }
 
+  // --- Data export/import for additional backup ---
+  function exportSessionData() {
+    const sessionData: SessionData = {
+      clockedIn,
+      onBreak,
+      clockInTime: clockInTime?.toISOString() || null,
+      clockOutTime: clockOutTime?.toISOString() || null,
+      breakStart: breakStart?.toISOString() || null,
+      totalBreakMs,
+      elapsedMs,
+      breakCounter,
+      lastSaved: Date.now()
+    };
+    
+    const dataStr = JSON.stringify(sessionData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `shifter-session-${Date.now()}.json`;
+    link.click();
+  }
+
+  function importSessionData(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string) as SessionData;
+        
+        // Validate the imported data
+        if (data && typeof data.clockedIn === 'boolean') {
+          setClockedIn(data.clockedIn);
+          setOnBreak(data.onBreak);
+          setClockInTime(data.clockInTime ? new Date(data.clockInTime) : null);
+          setClockOutTime(data.clockOutTime ? new Date(data.clockOutTime) : null);
+          setBreakStart(data.breakStart ? new Date(data.breakStart) : null);
+          setTotalBreakMs(data.totalBreakMs);
+          setElapsedMs(data.elapsedMs);
+          setBreakCounter(data.breakCounter);
+          
+          // Save the imported data
+          saveSessionData();
+        }
+      } catch (error) {
+        console.error('Failed to import session data:', error);
+        alert('Invalid session data file');
+      }
+    };
+    reader.readAsText(file);
+  }
+
   // --- Dynamic main background color ---
   let mainBg = "#fff";
   if (clockedIn && !onBreak) mainBg = "#c8f7c5";
@@ -167,6 +407,7 @@ export default function Home() {
     setElapsedMs(0);
     setBreakCounter(0);
     setConfirmClockOut(false);
+    clearSessionData();
   }
 
   // --- UI ---
@@ -176,6 +417,16 @@ export default function Home() {
       <div className="w-full bg-[#651818] flex items-center justify-between py-0 px-6" style={{ minHeight: 72, height: 72 }}>
         <div className="flex items-center gap-4 h-full" style={{ height: '100%' }}>
           <Image src="/logo.png" alt="Shifter v0 Logo" height={72} width={72} style={{ height: '100%', width: 'auto', objectFit: 'contain' }} priority />
+          {/* Backup menu button */}
+          <button 
+            onClick={() => setShowBackupMenu(!showBackupMenu)}
+            className="text-[#ff9860] hover:text-white transition-colors p-2 backup-menu"
+            title="Data backup options"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
         </div>
         {/* Home screen: show title at right */}
         {(!clockedIn && !onBreak && !showSummary) && (
@@ -183,8 +434,13 @@ export default function Home() {
         )}
         {/* Other screens: show time at right */}
         {((clockedIn || onBreak || showSummary) && !( !clockedIn && !onBreak && !showSummary )) && (
-          <div className="text-2xl font-mono text-[#ff9860] font-bold tracking-wider ml-auto">
-            {currentTime.split(":").slice(0, 2).join(":")}
+          <div className="flex items-center gap-2 ml-auto">
+            <div className="text-2xl font-mono text-[#ff9860] font-bold tracking-wider">
+              {currentTime.split(":").slice(0, 2).join(":")}
+            </div>
+            {isSaving && (
+              <div className="w-2 h-2 bg-[#22c55e] rounded-full animate-pulse"></div>
+            )}
           </div>
         )}
       </div>
@@ -260,6 +516,41 @@ export default function Home() {
             </div>
           )}
         </>
+      )}
+
+      {/* Recovery Message */}
+      {showRecoveryMessage && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-[#22c55e] text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in">
+          Session data recovered from backup
+        </div>
+      )}
+
+      {/* Backup Menu */}
+      {showBackupMenu && (
+        <div className="fixed top-16 left-4 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-2 min-w-48 backup-menu">
+          <div className="text-sm font-semibold text-gray-700 mb-2 px-2">Data Backup</div>
+          <button 
+            onClick={() => { exportSessionData(); setShowBackupMenu(false); }}
+            className="w-full text-left px-2 py-1 text-sm hover:bg-gray-100 rounded"
+          >
+            Export Session Data
+          </button>
+          <label className="block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 rounded cursor-pointer">
+            Import Session Data
+            <input 
+              type="file" 
+              accept=".json" 
+              onChange={(e) => { importSessionData(e); setShowBackupMenu(false); }}
+              className="hidden"
+            />
+          </label>
+          <button 
+            onClick={() => { clearSessionData(); resetToHome(); setShowBackupMenu(false); }}
+            className="w-full text-left px-2 py-1 text-sm hover:bg-gray-100 rounded text-red-600"
+          >
+            Clear All Data
+          </button>
+        </div>
       )}
 
       {/* Confetti Burst Overlay (canvas) - always on top */}
